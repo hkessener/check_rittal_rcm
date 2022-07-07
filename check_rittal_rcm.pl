@@ -3,58 +3,37 @@
 use strict;
 use warnings;
 
-use Getopt::Long;
+use Monitoring::Plugin;
 
 my $DEBUG = 0;
 ############################################################
 # check_rittal_rcm.pl
-# 04.07.2022, H. Kessener, LUIS
-############################################################
-sub printHelp() {
-  print qq|
-This plugin checks Rittal RCM devices.
-
-Usage: $0 -H <host> -C <community>
-
-|;
-}
-############################################################
-# nagios exit codes
-
-use constant EXIT_OK       => 0;
-use constant EXIT_WARNING  => 1;
-use constant EXIT_CRITICAL => 2;
-use constant EXIT_UNKNOWN  => 3;
 ############################################################
 
-Getopt::Long::Configure("bundling");
-
-my($opt_V,$opt_h,$opt_H,$opt_C,$opt_I,$opt_w,$opt_c);
-
-GetOptions(
-  "V"   => \$opt_V, "version"     => \$opt_V,
-  "h"   => \$opt_h, "help"        => \$opt_h,
-  "H=s" => \$opt_H, "hostname=s"  => \$opt_H,
-  "C=s" => \$opt_C, "community=s" => \$opt_C,
+my $p = Monitoring::Plugin->new(
+  usage => "This plugin checks Rittal RCM devices\n" .
+           "Usage: %s [-H <host>] [-C <community>]\n",
+  version => 'Version 0.11, July 7 2022, Hajo Kessener'
 );
 
-if($opt_V||$opt_h) {
-  printHelp();
-  exit(EXIT_UNKNOWN);
-}
+############################################################
 
-my($host,$community);
+$p->add_arg(
+  spec => 'host|H=s',
+  help => 'hostname or IP address',
+  required => 1
+);
 
-unless($opt_H) {
-  printHelp();
-  exit(EXIT_UNKNOWN);
-} else {
-  $host = $opt_H;
-}
+$p->add_arg(
+  spec => 'community|C=s',
+  help => 'SNMP community string',
+  required => 1
+);
 
-if($opt_C) {
-  $community = $opt_C;
-}
+$p->getopts();
+
+my $host = $p->opts->host;
+my $community = $p->opts->community;
 
 ############################################################
 
@@ -63,21 +42,20 @@ use Net::SNMP;
 my $OID = '1.3.6.1.4.1.2606.7.4.2.2.1';
 
 my ($session, $error) = Net::SNMP->session(
-   -hostname  => $host      || 'localhost',
-   -community => $community || 'public',
+   -hostname  => $host,
+   -community => $community,
 );
  
 if (!defined $session) {
-   printf "ERROR: %s.\n", $error;
-   exit EXIT_UNKNOWN;
+   $p->plugin_exit(UNKNOWN,"ERROR: ".$error);
 }
  
 my $result = $session->get_table(-baseoid => $OID);
  
 if (!defined $result) {
-   printf "ERROR: %s.\n", $session->error();
+   my $error = $session->error();
    $session->close();
-   exit EXIT_UNKNOWN;
+   $p->plugin_exit(UNKNOWN,"ERROR: ".$error);
 }
 
 my(@PData,@EMesg);
@@ -143,176 +121,73 @@ push(@PData, qq|'Total Energy Active'=$TotalEnergyActiveValue|);
 $TotalEnergyActiveRuntimeValue =~ s/ //g;
 push(@PData, qq|'Total Energy Active Runtime'=$TotalEnergyActiveRuntimeValue|);
 
-# Phase 1
-my $PhaseL1VoltageDescName     = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.25'};
-my $PhaseL1VoltageValue        = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.26'};
-my $PhaseL1VoltageStatus       = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.32'};
-my $PhaseL1VoltageTHDValue     = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.34'};
-my $PhaseL1CurrentDescName     = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.35'};
-my $PhaseL1CurrentValue        = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.36'};
-my $PhaseL1CurrentStatus       = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.42'};
-my $PhaseL1CurrentTHDValue     = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.44'};
-my $PhaseL1PowerFactorValue    = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.45'};
-my $PhaseL1PowerActiveDescName = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.46'};
-my $PhaseL1PowerActiveValue    = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.47'};
-my $PhaseL1PowerActiveStatus   = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.53'};
-my $PhaseL1PowerReactiveValue  = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.55'};
-my $PhaseL1PowerApparentValue  = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.56'};
-my $PhaseL1EnergyActiveValue   = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.57'};
-my $PhaseL1EnergyApparentValue = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.59'};
-$DEBUG and print qq|$PhaseL1VoltageDescName: $PhaseL1VoltageValue ($PhaseL1VoltageStatus)\n|;
-$DEBUG and print qq|PhaseL1VoltageTHDValue: $PhaseL1VoltageTHDValue\n|;
-$DEBUG and print qq|$PhaseL1CurrentDescName: $PhaseL1CurrentValue ($PhaseL1CurrentStatus)\n|;
-$DEBUG and print qq|PhaseL1CurrentTHDValue: $PhaseL1CurrentTHDValue\n|;
-$DEBUG and print qq|PhaseL1PowerFactorValue: $PhaseL1PowerFactorValue\n|;
-$DEBUG and print qq|$PhaseL1PowerActiveDescName: $PhaseL1PowerActiveValue ($PhaseL1PowerActiveStatus)\n|;
-$DEBUG and print qq|PhaseL1PowerReactiveValue: $PhaseL1PowerReactiveValue\n|;
-$DEBUG and print qq|PhaseL1PowerApparentValue: $PhaseL1PowerApparentValue\n|;
-$DEBUG and print qq|PhaseL1EnergyActiveValue: $PhaseL1EnergyActiveValue\n|;
-$DEBUG and print qq|PhaseL1EnergyApparentValue: $PhaseL1EnergyApparentValue\n|;
+# Phases L1...L3
+for(my $Lx = 1; $Lx <= 3; $Lx++) {
 
-if($PhaseL1VoltageStatus ne 'OK') {
-  push(@EMesg, qq|L1: $PhaseL1VoltageStatus|);
-}
-if($PhaseL1CurrentStatus ne 'OK') {
-  push(@EMesg, qq|L1: $PhaseL1CurrentStatus|);
-}
-if($PhaseL1PowerActiveStatus ne 'OK') {
-  push(@EMesg, qq|L1: $PhaseL1PowerActiveStatus|);
-}
-$PhaseL1VoltageValue =~ s/ //g;
-push(@PData, qq|'L1 Voltage'=$PhaseL1VoltageValue|);
-$PhaseL1VoltageTHDValue =~ s/ //g;
-push(@PData, qq|'L1 Voltage THD'=$PhaseL1VoltageTHDValue|);
-$PhaseL1CurrentValue =~ s/ //g;
-push(@PData, qq|'L1 Current'=$PhaseL1CurrentValue|);
-$PhaseL1CurrentTHDValue =~ s/ //g;
-push(@PData, qq|'L1 Current THD'=$PhaseL1CurrentTHDValue|);
-push(@PData, qq|'L1 Power Factor'=$PhaseL1PowerFactorValue|);
-$PhaseL1PowerActiveValue =~ s/ //g;
-push(@PData, qq|'L1 Power Active'=$PhaseL1PowerActiveValue|);
-$PhaseL1PowerReactiveValue =~ s/ //g;
-push(@PData, qq|'L1 Power Reactive'=$PhaseL1PowerReactiveValue|);
-$PhaseL1PowerApparentValue =~ s/ //g;
-push(@PData, qq|'L1 Power Apparent'=$PhaseL1PowerApparentValue|);
-$PhaseL1EnergyActiveValue =~ s/ //g;
-push(@PData, qq|'L1 Energy Active'=$PhaseL1EnergyActiveValue|);
-$PhaseL1EnergyApparentValue =~ s/ //g;
-push(@PData, qq|'L1 Energy Apparent'=$PhaseL1EnergyApparentValue|);
+  # OID base:
+  my $bx = '1.3.6.1.4.1.2606.7.4.2.2.1.10.2';
+  # OID offset:
+  # L1 values start at OID '1.3.6.1.4.1.2606.7.4.2.2.1.10.2.25'
+  # L1 values start at OID '1.3.6.1.4.1.2606.7.4.2.2.1.10.2.60'
+  # L1 values start at OID '1.3.6.1.4.1.2606.7.4.2.2.1.10.2.95'
+  my $ox = ($Lx - 1) * 35 + 25;
 
-# Phase 2
-my $PhaseL2VoltageDescName     = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.60'};
-my $PhaseL2VoltageValue        = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.61'};
-my $PhaseL2VoltageStatus       = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.67'};
-my $PhaseL2VoltageTHDValue     = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.69'};
-my $PhaseL2CurrentDescName     = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.70'};
-my $PhaseL2CurrentValue        = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.71'};
-my $PhaseL2CurrentStatus       = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.77'};
-my $PhaseL2CurrentTHDValue     = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.79'};
-my $PhaseL2PowerFactorValue    = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.80'};
-my $PhaseL2PowerActiveDescName = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.81'};
-my $PhaseL2PowerActiveValue    = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.82'};
-my $PhaseL2PowerActiveStatus   = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.88'};
-my $PhaseL2PowerReactiveValue  = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.90'};
-my $PhaseL2PowerApparentValue  = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.91'};
-my $PhaseL2EnergyActiveValue   = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.92'};
-my $PhaseL2EnergyApparentValue = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.94'};
-$DEBUG and print qq|$PhaseL2VoltageDescName: $PhaseL2VoltageValue ($PhaseL2VoltageStatus)\n|;
-$DEBUG and print qq|PhaseL2VoltageTHDValue: $PhaseL2VoltageTHDValue\n|;
-$DEBUG and print qq|$PhaseL2CurrentDescName: $PhaseL2CurrentValue ($PhaseL2CurrentStatus)\n|;
-$DEBUG and print qq|PhaseL2CurrentTHDValue: $PhaseL2CurrentTHDValue\n|;
-$DEBUG and print qq|PhaseL2PowerFactorValue: $PhaseL2PowerFactorValue\n|;
-$DEBUG and print qq|$PhaseL2PowerActiveDescName: $PhaseL2PowerActiveValue ($PhaseL2PowerActiveStatus)\n|;
-$DEBUG and print qq|PhaseL2PowerReactiveValue: $PhaseL2PowerReactiveValue\n|;
-$DEBUG and print qq|PhaseL2PowerApparentValue: $PhaseL2PowerApparentValue\n|;
-$DEBUG and print qq|PhaseL2EnergyActiveValue: $PhaseL2EnergyActiveValue\n|;
-$DEBUG and print qq|PhaseL2EnergyApparentValue: $PhaseL2EnergyApparentValue\n|;
+  my $PhaseVoltageDescName     = $result->{sprintf("%s.%u",$bx,$ox+ 0)}; # 25
+  my $PhaseVoltageValue        = $result->{sprintf("%s.%u",$bx,$ox+ 1)}; # 26
+  my $PhaseVoltageStatus       = $result->{sprintf("%s.%u",$bx,$ox+ 7)}; # 32
+  my $PhaseVoltageTHDValue     = $result->{sprintf("%s.%u",$bx,$ox+ 9)}; # 34
+  my $PhaseCurrentDescName     = $result->{sprintf("%s.%u",$bx,$ox+10)}; # 35
+  my $PhaseCurrentValue        = $result->{sprintf("%s.%u",$bx,$ox+11)}; # 36
+  my $PhaseCurrentStatus       = $result->{sprintf("%s.%u",$bx,$ox+17)}; # 42
+  my $PhaseCurrentTHDValue     = $result->{sprintf("%s.%u",$bx,$ox+19)}; # 44
+  my $PhasePowerFactorValue    = $result->{sprintf("%s.%u",$bx,$ox+20)}; # 45
+  my $PhasePowerActiveDescName = $result->{sprintf("%s.%u",$bx,$ox+21)}; # 46
+  my $PhasePowerActiveValue    = $result->{sprintf("%s.%u",$bx,$ox+22)}; # 47
+  my $PhasePowerActiveStatus   = $result->{sprintf("%s.%u",$bx,$ox+28)}; # 53
+  my $PhasePowerReactiveValue  = $result->{sprintf("%s.%u",$bx,$ox+30)}; # 55
+  my $PhasePowerApparentValue  = $result->{sprintf("%s.%u",$bx,$ox+31)}; # 56
+  my $PhaseEnergyActiveValue   = $result->{sprintf("%s.%u",$bx,$ox+32)}; # 57
+  my $PhaseEnergyApparentValue = $result->{sprintf("%s.%u",$bx,$ox+34)}; # 59
+  $DEBUG and print qq|$PhaseVoltageDescName: $PhaseVoltageValue ($PhaseVoltageStatus)\n|;
+  $DEBUG and print qq|Phase L$Lx VoltageTHDValue: $PhaseVoltageTHDValue\n|;
+  $DEBUG and print qq|$PhaseCurrentDescName: $PhaseCurrentValue ($PhaseCurrentStatus)\n|;
+  $DEBUG and print qq|Phase L$Lx CurrentTHDValue: $PhaseCurrentTHDValue\n|;
+  $DEBUG and print qq|Phase L$Lx PowerFactorValue: $PhasePowerFactorValue\n|;
+  $DEBUG and print qq|$PhasePowerActiveDescName: $PhasePowerActiveValue ($PhasePowerActiveStatus)\n|;
+  $DEBUG and print qq|Phase L$Lx PowerReactiveValue: $PhasePowerReactiveValue\n|;
+  $DEBUG and print qq|Phase L$Lx PowerApparentValue: $PhasePowerApparentValue\n|;
+  $DEBUG and print qq|Phase L$Lx EnergyActiveValue: $PhaseEnergyActiveValue\n|;
+  $DEBUG and print qq|Phase L$Lx EnergyApparentValue: $PhaseEnergyApparentValue\n|;
 
-if($PhaseL2VoltageStatus ne 'OK') {
-  push(@EMesg, qq|L2: $PhaseL2VoltageStatus|);
+  if($PhaseVoltageStatus ne 'OK') {
+    push(@EMesg, qq|L$Lx: $PhaseVoltageStatus|);
+  }
+  if($PhaseCurrentStatus ne 'OK') {
+    push(@EMesg, qq|L$Lx: $PhaseCurrentStatus|);
+  }
+  if($PhasePowerActiveStatus ne 'OK') {
+    push(@EMesg, qq|L$Lx: $PhasePowerActiveStatus|);
+  }
+  $PhaseVoltageValue =~ s/ //g;
+  push(@PData, qq|'L$Lx Voltage'=$PhaseVoltageValue|);
+  $PhaseVoltageTHDValue =~ s/ //g;
+  push(@PData, qq|'L$Lx Voltage THD'=$PhaseVoltageTHDValue|);
+  $PhaseCurrentValue =~ s/ //g;
+  push(@PData, qq|'L$Lx Current'=$PhaseCurrentValue|);
+  $PhaseCurrentTHDValue =~ s/ //g;
+  push(@PData, qq|'L$Lx Current THD'=$PhaseCurrentTHDValue|);
+  push(@PData, qq|'L$Lx Power Factor'=$PhasePowerFactorValue|);
+  $PhasePowerActiveValue =~ s/ //g;
+  push(@PData, qq|'L$Lx Power Active'=$PhasePowerActiveValue|);
+  $PhasePowerReactiveValue =~ s/ //g;
+  push(@PData, qq|'L$Lx Power Reactive'=$PhasePowerReactiveValue|);
+  $PhasePowerApparentValue =~ s/ //g;
+  push(@PData, qq|'L$Lx Power Apparent'=$PhasePowerApparentValue|);
+  $PhaseEnergyActiveValue =~ s/ //g;
+  push(@PData, qq|'L$Lx Energy Active'=$PhaseEnergyActiveValue|);
+  $PhaseEnergyApparentValue =~ s/ //g;
+  push(@PData, qq|'L$Lx Energy Apparent'=$PhaseEnergyApparentValue|);
 }
-if($PhaseL2CurrentStatus ne 'OK') {
-  push(@EMesg, qq|L2: $PhaseL2CurrentStatus|);
-}
-if($PhaseL2PowerActiveStatus ne 'OK') {
-  push(@EMesg, qq|L2: $PhaseL2PowerActiveStatus|);
-}
-$PhaseL2VoltageValue =~ s/ //g;
-push(@PData, qq|'L2 Voltage'=$PhaseL2VoltageValue|);
-$PhaseL2VoltageTHDValue =~ s/ //g;
-push(@PData, qq|'L2 Voltage THD'=$PhaseL2VoltageTHDValue|);
-$PhaseL2CurrentValue =~ s/ //g;
-push(@PData, qq|'L2 Current'=$PhaseL2CurrentValue|);
-$PhaseL2CurrentTHDValue =~ s/ //g;
-push(@PData, qq|'L2 Current THD'=$PhaseL2CurrentTHDValue|);
-push(@PData, qq|'L2 Power Factor'=$PhaseL2PowerFactorValue|);
-$PhaseL2PowerActiveValue =~ s/ //g;
-push(@PData, qq|'L2 Power Active'=$PhaseL2PowerActiveValue|);
-$PhaseL2PowerReactiveValue =~ s/ //g;
-push(@PData, qq|'L2 Power Reactive'=$PhaseL2PowerReactiveValue|);
-$PhaseL2PowerApparentValue =~ s/ //g;
-push(@PData, qq|'L2 Power Apparent'=$PhaseL2PowerApparentValue|);
-$PhaseL2EnergyActiveValue =~ s/ //g;
-push(@PData, qq|'L2 Energy Active'=$PhaseL2EnergyActiveValue|);
-$PhaseL2EnergyApparentValue =~ s/ //g;
-push(@PData, qq|'L2 Energy Apparent'=$PhaseL2EnergyApparentValue|);
-
-# Phase 3
-my $PhaseL3VoltageDescName     = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.95'};
-my $PhaseL3VoltageValue        = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.96'};
-my $PhaseL3VoltageStatus       = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.102'};
-my $PhaseL3VoltageTHDValue     = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.104'};
-my $PhaseL3CurrentDescName     = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.105'};
-my $PhaseL3CurrentValue        = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.106'};
-my $PhaseL3CurrentStatus       = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.112'};
-my $PhaseL3CurrentTHDValue     = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.114'};
-my $PhaseL3PowerFactorValue    = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.115'};
-my $PhaseL3PowerActiveDescName = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.116'};
-my $PhaseL3PowerActiveValue    = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.117'};
-my $PhaseL3PowerActiveStatus   = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.123'};
-my $PhaseL3PowerReactiveValue  = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.125'};
-my $PhaseL3PowerApparentValue  = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.126'};
-my $PhaseL3EnergyActiveValue   = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.127'};
-my $PhaseL3EnergyApparentValue = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.129'};
-$DEBUG and print qq|$PhaseL3VoltageDescName: $PhaseL3VoltageValue ($PhaseL3VoltageStatus)\n|;
-$DEBUG and print qq|PhaseL3VoltageTHDValue: $PhaseL3VoltageTHDValue\n|;
-$DEBUG and print qq|$PhaseL3CurrentDescName: $PhaseL3CurrentValue ($PhaseL3CurrentStatus)\n|;
-$DEBUG and print qq|PhaseL3CurrentTHDValue: $PhaseL3CurrentTHDValue\n|;
-$DEBUG and print qq|PhaseL3PowerFactorValue: $PhaseL3PowerFactorValue\n|;
-$DEBUG and print qq|$PhaseL3PowerActiveDescName: $PhaseL3PowerActiveValue ($PhaseL3PowerActiveStatus)\n|;
-$DEBUG and print qq|PhaseL3PowerReactiveValue: $PhaseL3PowerReactiveValue\n|;
-$DEBUG and print qq|PhaseL3PowerApparentValue: $PhaseL3PowerApparentValue\n|;
-$DEBUG and print qq|PhaseL3EnergyActiveValue: $PhaseL3EnergyActiveValue\n|;
-$DEBUG and print qq|PhaseL3EnergyApparentValue: $PhaseL3EnergyApparentValue\n|;
-
-if($PhaseL3VoltageStatus ne 'OK') {
-  push(@EMesg, qq|L3: $PhaseL3VoltageStatus|);
-}
-if($PhaseL3CurrentStatus ne 'OK') {
-  push(@EMesg, qq|L3: $PhaseL3CurrentStatus|);
-}
-if($PhaseL3PowerActiveStatus ne 'OK') {
-  push(@EMesg, qq|L3: $PhaseL3PowerActiveStatus|);
-}
-$PhaseL3VoltageValue =~ s/ //g;
-push(@PData, qq|'L3 Voltage'=$PhaseL3VoltageValue|);
-$PhaseL3VoltageTHDValue =~ s/ //g;
-push(@PData, qq|'L3 Voltage THD'=$PhaseL3VoltageTHDValue|);
-$PhaseL3CurrentValue =~ s/ //g;
-push(@PData, qq|'L3 Current'=$PhaseL3CurrentValue|);
-$PhaseL3CurrentTHDValue =~ s/ //g;
-push(@PData, qq|'L3 Current THD'=$PhaseL3CurrentTHDValue|);
-push(@PData, qq|'L3 Power Factor'=$PhaseL3PowerFactorValue|);
-$PhaseL3PowerActiveValue =~ s/ //g;
-push(@PData, qq|'L3 Power Active'=$PhaseL3PowerActiveValue|);
-$PhaseL3PowerReactiveValue =~ s/ //g;
-push(@PData, qq|'L3 Power Reactive'=$PhaseL3PowerReactiveValue|);
-$PhaseL3PowerApparentValue =~ s/ //g;
-push(@PData, qq|'L3 Power Apparent'=$PhaseL3PowerApparentValue|);
-$PhaseL3EnergyActiveValue =~ s/ //g;
-push(@PData, qq|'L3 Energy Active'=$PhaseL3EnergyActiveValue|);
-$PhaseL3EnergyApparentValue =~ s/ //g;
-push(@PData, qq|'L3 Energy Apparent'=$PhaseL3EnergyApparentValue|);
 
 # RCM01
 my $RCMsRCM01GeneralStatus = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.134'};
@@ -359,24 +234,18 @@ $session->close();
 ############################################################
 # output results
 
+#$p->add_perfdata(... to be done...);
 my $pdata_output = join(' ', @PData);
 
-my $check_status = EXIT_UNKNOWN;
-my $check_output = 'UNKNOWN';
-my $error_output = '';
-
 if(@EMesg > 0) {
-  $check_status = EXIT_WARNING;
-  $check_output = 'WARNING';
-  $error_output = join('. ',@EMesg);
-  print qq|$check_output: $error_output \| $pdata_output\n|;
+  my $msg = join('. ',@EMesg);
+     $msg .= ' | '. $pdata_output;
+  $p->plugin_exit(WARNING, $msg);
 } else {
-  $check_status = EXIT_OK;
-  $check_output = 'OK';
-  print qq|$check_output: Total Power Active is $TotalPowerActiveStatus \| $pdata_output\n|;
+  my $msg = qq|Total Power Active is $TotalPowerActiveStatus|;
+     $msg .= ' | '. $pdata_output;
+  $p->plugin_exit(OK, $msg);
 }
-
-exit $check_status;
 
 ############################################################
 1;
