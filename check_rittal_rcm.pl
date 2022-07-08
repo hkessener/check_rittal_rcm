@@ -9,14 +9,19 @@ my $DEBUG = 0;
 ############################################################
 # check_rittal_rcm.pl
 ############################################################
+# Prototypes
+sub ProcessValue($$$);
+############################################################
+# Startup
 
 my $p = Monitoring::Plugin->new(
   usage => "This plugin checks Rittal RCM devices\n" .
            "Usage: %s [-H <host>] [-C <community>]\n",
-  version => 'Version 0.11, July 7 2022, Hajo Kessener'
+  version => 'Version 0.12, July 8 2022, Hajo Kessener'
 );
 
 ############################################################
+# Arguments
 
 $p->add_arg(
   spec => 'host|H=s',
@@ -36,6 +41,7 @@ my $host = $p->opts->host;
 my $community = $p->opts->community;
 
 ############################################################
+# SNMP query
 
 use Net::SNMP;
 
@@ -58,68 +64,54 @@ if (!defined $result) {
    $p->plugin_exit(UNKNOWN,"ERROR: ".$error);
 }
 
-my(@PData,@EMesg);
+############################################################
+# Process section "System"
 
-# ---------------- System ----------------
+# Input.Status (just informational yet)
+my $InputDescName = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.1'};
+my $InputStatus   = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.5'};
 
-my $InputDescName   = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.1'};
-my $InputStatus     = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.5'};
-$DEBUG and print qq|$InputDescName: $InputStatus\n|;
+# Output.Status (just informational yet)
+my $OutputDescName = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.7'};
+my $OutputStatus   = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.10'};
 
-my $OutputDescName  = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.7'};
-my $OutputStatus    = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.10'};
-$DEBUG and print qq|$OutputDescName: $OutputStatus\n|;
-
+# System Health.Temperature
 my $SystemHealthTemperatureErrorInfo = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.21'};
 my $SystemHealthTemperatureStatus    = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.22'};
-$DEBUG and print qq|System-Health Temperature: $SystemHealthTemperatureStatus ($SystemHealthTemperatureErrorInfo)\n|;
 
 if($SystemHealthTemperatureStatus ne 'OK') {
-  push(@EMesg, $SystemHealthTemperatureErrorInfo);
+  $p->add_message(WARNING, $SystemHealthTemperatureErrorInfo);
 }
 
+# System Health.Current
 my $SystemHealthCurrentErrorInfo = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.26'};
 my $SystemHealthCurrentStatus    = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.27'};
-$DEBUG and print qq|System-Health Current: $SystemHealthCurrentStatus ($SystemHealthCurrentErrorInfo)\n|;
 
 if($SystemHealthCurrentStatus ne 'OK') {
-  push(@EMesg, $SystemHealthCurrentErrorInfo);
+  $p->add_message(WARNING, $SystemHealthCurrentErrorInfo);
 }
 
-my $SystemHealthSuppyErrorInfo = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.30'};
-my $SystemHealthSuppyStatus    = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.31'};
-$DEBUG and print qq|System-Health Supply: $SystemHealthSuppyStatus ($SystemHealthSuppyErrorInfo)\n|;
+# System Health.Supply
+my $SystemHealthSupplyErrorInfo = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.30'};
+my $SystemHealthSupplyStatus    = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.1.31'};
 
-if($SystemHealthSuppyStatus ne 'OK') {
-  push(@EMesg, $SystemHealthSuppyErrorInfo);
+if($SystemHealthSupplyStatus ne 'OK') {
+  $p->add_message(WARNING, $SystemHealthSupplyErrorInfo);
 }
 
-# ---------------- RCM-Inline ----------------
+############################################################
+# Process section "RCM-Inline"
 
-my $TotalFrequencyValue = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.1'};
-$DEBUG and print qq|Mains Frequency: $TotalFrequencyValue\n|;
-$TotalFrequencyValue =~ s/ //g;
-push(@PData, qq|'Total Frequency'=$TotalFrequencyValue|);
-
-my $TotalNeutralCurrentDescName  = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.2'};
-my $TotalNeutralCurrentStatus    = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.3'};
-$DEBUG and print qq|$TotalNeutralCurrentDescName: $TotalNeutralCurrentStatus\n|;
-$TotalNeutralCurrentStatus =~ s/ //g;
-push(@PData, qq|'Total Neutral Current'=$TotalNeutralCurrentStatus|);
-
-my $TotalPowerActiveDescName  = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.11'};
-my $TotalPowerActiveStatus    = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.12'};
-$DEBUG and print qq|$TotalPowerActiveDescName: $TotalPowerActiveStatus\n|;
-$TotalPowerActiveStatus =~ s/ //g;
-push(@PData, qq|'Total Power Active'=$TotalPowerActiveStatus|);
-
-my $TotalEnergyActiveValue        = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.20'};
-my $TotalEnergyActiveRuntimeValue = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.21'};
-$DEBUG and print qq|Total Energy Active: $TotalEnergyActiveValue ($TotalEnergyActiveRuntimeValue)\n|;
-$TotalEnergyActiveValue =~ s/ //g;
-push(@PData, qq|'Total Energy Active'=$TotalEnergyActiveValue|);
-$TotalEnergyActiveRuntimeValue =~ s/ //g;
-push(@PData, qq|'Total Energy Active Runtime'=$TotalEnergyActiveRuntimeValue|);
+# Total.Frequency.Value
+ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.1');
+# Total.Neutral Current.Value
+ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.3');
+# Total.Power.Active.Value
+ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.12');
+# Total.Energy.Active.Value
+ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.20');
+# Total.Energy.Active.Runtime.Value
+ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.21');
 
 # Phases L1...L3
 for(my $Lx = 1; $Lx <= 3; $Lx++) {
@@ -132,119 +124,171 @@ for(my $Lx = 1; $Lx <= 3; $Lx++) {
   # L1 values start at OID '1.3.6.1.4.1.2606.7.4.2.2.1.10.2.95'
   my $ox = ($Lx - 1) * 35 + 25;
 
-  my $PhaseVoltageDescName     = $result->{sprintf("%s.%u",$bx,$ox+ 0)}; # 25
-  my $PhaseVoltageValue        = $result->{sprintf("%s.%u",$bx,$ox+ 1)}; # 26
-  my $PhaseVoltageStatus       = $result->{sprintf("%s.%u",$bx,$ox+ 7)}; # 32
-  my $PhaseVoltageTHDValue     = $result->{sprintf("%s.%u",$bx,$ox+ 9)}; # 34
-  my $PhaseCurrentDescName     = $result->{sprintf("%s.%u",$bx,$ox+10)}; # 35
-  my $PhaseCurrentValue        = $result->{sprintf("%s.%u",$bx,$ox+11)}; # 36
-  my $PhaseCurrentStatus       = $result->{sprintf("%s.%u",$bx,$ox+17)}; # 42
-  my $PhaseCurrentTHDValue     = $result->{sprintf("%s.%u",$bx,$ox+19)}; # 44
-  my $PhasePowerFactorValue    = $result->{sprintf("%s.%u",$bx,$ox+20)}; # 45
-  my $PhasePowerActiveDescName = $result->{sprintf("%s.%u",$bx,$ox+21)}; # 46
-  my $PhasePowerActiveValue    = $result->{sprintf("%s.%u",$bx,$ox+22)}; # 47
-  my $PhasePowerActiveStatus   = $result->{sprintf("%s.%u",$bx,$ox+28)}; # 53
-  my $PhasePowerReactiveValue  = $result->{sprintf("%s.%u",$bx,$ox+30)}; # 55
-  my $PhasePowerApparentValue  = $result->{sprintf("%s.%u",$bx,$ox+31)}; # 56
-  my $PhaseEnergyActiveValue   = $result->{sprintf("%s.%u",$bx,$ox+32)}; # 57
-  my $PhaseEnergyApparentValue = $result->{sprintf("%s.%u",$bx,$ox+34)}; # 59
-  $DEBUG and print qq|$PhaseVoltageDescName: $PhaseVoltageValue ($PhaseVoltageStatus)\n|;
-  $DEBUG and print qq|Phase L$Lx VoltageTHDValue: $PhaseVoltageTHDValue\n|;
-  $DEBUG and print qq|$PhaseCurrentDescName: $PhaseCurrentValue ($PhaseCurrentStatus)\n|;
-  $DEBUG and print qq|Phase L$Lx CurrentTHDValue: $PhaseCurrentTHDValue\n|;
-  $DEBUG and print qq|Phase L$Lx PowerFactorValue: $PhasePowerFactorValue\n|;
-  $DEBUG and print qq|$PhasePowerActiveDescName: $PhasePowerActiveValue ($PhasePowerActiveStatus)\n|;
-  $DEBUG and print qq|Phase L$Lx PowerReactiveValue: $PhasePowerReactiveValue\n|;
-  $DEBUG and print qq|Phase L$Lx PowerApparentValue: $PhasePowerApparentValue\n|;
-  $DEBUG and print qq|Phase L$Lx EnergyActiveValue: $PhaseEnergyActiveValue\n|;
-  $DEBUG and print qq|Phase L$Lx EnergyApparentValue: $PhaseEnergyApparentValue\n|;
+  # Phase Lx.Voltage.Value
+  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+ 1)); #26
+  # Phase Lx.Voltage.THD.Value
+  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+ 9)); #34
+  # Phase Lx.Current.Value
+  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+11)); #36
+  # Phase Lx.Current.THD.Value
+  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+19)); #44
+  # Phase Lx.Power.Factor.Value
+  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+20)); #45
+  # Phase Lx.Power.Active.Value
+  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+22)); #47
+  # Phase Lx.Power.Reactive.Value
+  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+30)); #55
+  # Phase Lx.Power.Apparent.Value
+  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+31)); #56
+  # Phase Lx.Energy.Active.Value
+  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+32)); #57
+  # Phase Lx.Energy.Apparent.Value
+  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+34)); #59
 
+  # Phase Lx.Voltage.Status
+  my $PhaseVoltageStatus     = $result->{sprintf("%s.%u",$bx,$ox+ 7)}; # 32
   if($PhaseVoltageStatus ne 'OK') {
-    push(@EMesg, qq|L$Lx: $PhaseVoltageStatus|);
+    $p->add_message(WARNING, qq|L$Lx: $PhaseVoltageStatus|);
   }
+
+  # Phase Lx.Current.Status
+  my $PhaseCurrentStatus     = $result->{sprintf("%s.%u",$bx,$ox+17)}; # 42
   if($PhaseCurrentStatus ne 'OK') {
-    push(@EMesg, qq|L$Lx: $PhaseCurrentStatus|);
+    $p->add_message(WARNING, qq|L$Lx: $PhaseCurrentStatus|);
   }
+
+  # Phase Lx.Power.Active.Status
+  my $PhasePowerActiveStatus = $result->{sprintf("%s.%u",$bx,$ox+28)}; # 53
   if($PhasePowerActiveStatus ne 'OK') {
-    push(@EMesg, qq|L$Lx: $PhasePowerActiveStatus|);
+    $p->add_message(WARNING, qq|L$Lx: $PhasePowerActiveStatus|);
   }
-  $PhaseVoltageValue =~ s/ //g;
-  push(@PData, qq|'L$Lx Voltage'=$PhaseVoltageValue|);
-  $PhaseVoltageTHDValue =~ s/ //g;
-  push(@PData, qq|'L$Lx Voltage THD'=$PhaseVoltageTHDValue|);
-  $PhaseCurrentValue =~ s/ //g;
-  push(@PData, qq|'L$Lx Current'=$PhaseCurrentValue|);
-  $PhaseCurrentTHDValue =~ s/ //g;
-  push(@PData, qq|'L$Lx Current THD'=$PhaseCurrentTHDValue|);
-  push(@PData, qq|'L$Lx Power Factor'=$PhasePowerFactorValue|);
-  $PhasePowerActiveValue =~ s/ //g;
-  push(@PData, qq|'L$Lx Power Active'=$PhasePowerActiveValue|);
-  $PhasePowerReactiveValue =~ s/ //g;
-  push(@PData, qq|'L$Lx Power Reactive'=$PhasePowerReactiveValue|);
-  $PhasePowerApparentValue =~ s/ //g;
-  push(@PData, qq|'L$Lx Power Apparent'=$PhasePowerApparentValue|);
-  $PhaseEnergyActiveValue =~ s/ //g;
-  push(@PData, qq|'L$Lx Energy Active'=$PhaseEnergyActiveValue|);
-  $PhaseEnergyApparentValue =~ s/ //g;
-  push(@PData, qq|'L$Lx Energy Apparent'=$PhaseEnergyApparentValue|);
 }
-
-# RCM01
-my $RCMsRCM01GeneralStatus = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.134'};
-$DEBUG and print qq|RCMsRCM01GeneralStatus: $RCMsRCM01GeneralStatus\n|;
-if($RCMsRCM01GeneralStatus ne 'OK') {
-  push(@EMesg, qq|RCM01 General-Status: $RCMsRCM01GeneralStatus|);
-}
-
-my $RCMsRCM01ACDescName       = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.136'};
-my $RCMsRCM01ACValue          = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.137'};
-my $RCMsRCM01ACSetPtHighAlarm = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.138'};
-my $RCMsRCM01ACSetPtHighWarn  = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.139'};
-my $RCMsRCM01ACStatus         = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.141'};
-$DEBUG and print qq|$RCMsRCM01ACDescName: $RCMsRCM01ACValue;[$RCMsRCM01ACSetPtHighWarn];[$RCMsRCM01ACSetPtHighAlarm] ($RCMsRCM01ACStatus)\n|;
-if($RCMsRCM01ACStatus ne 'OK') {
-  push(@EMesg, qq|RCM01 AC-Status: $RCMsRCM01ACStatus|);
-}
-$RCMsRCM01ACValue =~ s/ //g;
-push(@PData, qq|'RCM AC value'=$RCMsRCM01ACValue|);
-$RCMsRCM01ACSetPtHighAlarm =~ s/ //g;
-push(@PData, qq|'RCM AC Setpoint High Alarm'=$RCMsRCM01ACSetPtHighAlarm|);
-$RCMsRCM01ACSetPtHighWarn =~ s/ //g;
-push(@PData, qq|'RCM AC Setpoint High Warn'=$RCMsRCM01ACSetPtHighWarn|);
-
-my $RCMsRCM01DCDescName       = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.143'};
-my $RCMsRCM01DCValue          = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.144'};
-my $RCMsRCM01DCSetPtHighAlarm = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.145'};
-my $RCMsRCM01DCSetPtHighWarn  = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.146'};
-my $RCMsRCM01DCStatus         = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.148'};
-$DEBUG and print qq|$RCMsRCM01DCDescName: $RCMsRCM01DCValue;[$RCMsRCM01DCSetPtHighWarn];[$RCMsRCM01DCSetPtHighAlarm] ($RCMsRCM01DCStatus)\n|;
-if($RCMsRCM01DCStatus ne 'OK') {
-  push(@EMesg, qq|RCM01 DC-Status: $RCMsRCM01DCStatus|);
-}
-$RCMsRCM01DCValue =~ s/ //g;
-push(@PData, qq|'RCM DC value'=$RCMsRCM01DCValue|);
-$RCMsRCM01DCSetPtHighAlarm =~ s/ //g;
-push(@PData, qq|'RCM DC Setpoint High Alarm'=$RCMsRCM01DCSetPtHighAlarm|);
-$RCMsRCM01DCSetPtHighWarn =~ s/ //g;
-push(@PData, qq|'RCM DC Setpoint High Warn'=$RCMsRCM01DCSetPtHighWarn|);
-
-# done
-$session->close();
 
 ############################################################
+# Process section "RCM 01"
+
+# RCMs.RCM 01.General.Status
+my $RCMsRCM01GeneralStatus = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.134'};
+
+if($RCMsRCM01GeneralStatus ne 'OK') {
+  $p->add_message(WARNING, qq|RCM01 General-Status: $RCMsRCM01GeneralStatus|);
+}
+
+# RCMs.RCM 01.AC.Value
+ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.137');
+# RCMs.RCM 01.AC.SetPtHighAlarm
+ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.138');
+# RCMs.RCM 01.AC.SetPtHighWarn
+ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.139');
+
+# RCMs.RCM 01.AC.Status
+my $RCMsRCM01ACStatus = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.141'};
+
+if($RCMsRCM01ACStatus ne 'OK') {
+  $p->add_message(WARNING, qq|RCM01 AC-Status: $RCMsRCM01ACStatus|);
+}
+
+# RCMs.RCM 01.DC.Value
+ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.144');
+# RCMs.RCM 01.DC.SetPtHighAlarm
+ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.145');
+# RCMs.RCM 01.DC.SetPtHighWarn
+ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.146');
+
+# RCMs.RCM 01.DC.Status
+my $RCMsRCM01DCStatus = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.148'};
+
+if($RCMsRCM01DCStatus ne 'OK') {
+  $p->add_message(WARNING, qq|RCM01 DC-Status: $RCMsRCM01DCStatus|);
+}
+
+###########################################################
+# SNMP query done
+$session->close();
+
+###########################################################
 # output results
 
-#$p->add_perfdata(... to be done...);
-my $pdata_output = join(' ', @PData);
+my($code,$msgs) = $p->check_messages();
 
-if(@EMesg > 0) {
-  my $msg = join('. ',@EMesg);
-     $msg .= ' | '. $pdata_output;
-  $p->plugin_exit(WARNING, $msg);
-} else {
-  my $msg = qq|Total Power Active is $TotalPowerActiveStatus|;
-     $msg .= ' | '. $pdata_output;
-  $p->plugin_exit(OK, $msg);
+if($code != OK) {
+  $p->plugin_exit($code,$msgs);
+}
+
+$p->plugin_exit(OK, "should add my message!");
+
+############################################################
+sub ProcessValue($$$) {
+  my($plugin,$result,$baseOID) = @_ or return(undef);
+
+  my($OID,@List);
+
+  # get cmcIIIVarName --> 2606.7.4.2.2.1.3.2.1
+  @List = split(/\./,$baseOID); $List[12] = 3; $OID = join('.',@List);
+  my $label = $result->{$OID};
+
+  # get cmcIIIVarUnit --> 2606.7.4.2.2.1.5.2.1
+  @List = split(/\./,$baseOID); $List[12] = 5; $OID = join('.',@List);
+  my $uom = $result->{$OID};
+
+  # get cmcIIIVarType --> 2606.7.4.2.2.1.6.2.1
+  @List = split(/\./,$baseOID); $List[12] = 6; $OID = join('.',@List);
+  my $type = $result->{$OID};
+
+  # get cmcIIIVarScale --> 2606.7.4.2.2.1.7.2.1
+  @List = split(/\./,$baseOID); $List[12] = 7; $OID = join('.',@List);
+  my $scale = $result->{$OID};
+
+  # get cmcIIIVarConstraints --> 2606.7.4.2.2.1.8.2.1
+  @List = split(/\./,$baseOID); $List[12] = 8; $OID = join('.',@List);
+  my $constraints = $result->{$OID};
+
+  # get cmcIIIVarSteps --> 2606.7.4.2.2.1.9.2.1
+  @List = split(/\./,$baseOID); $List[12] = 9; $OID = join('.',@List);
+  my $steps = $result->{$OID};
+
+  # get cmcIIIVarValueInt --> 2606.7.4.2.2.1.11.2.1
+  @List = split(/\./,$baseOID); $List[12] = 11; $OID = join('.',@List);
+  my $value = $result->{$OID};
+
+  # do value scaling
+  $value = ($scale < 0) ? $value / abs($scale) : $value * $scale;
+
+# my($warn,$crit,$min,$max);
+
+# $warn = 0;
+# $crit = 0;
+# $min  = 0;
+# $max  = 0;
+
+  # label=value[uom];[warn];[crit];[min];[max]
+  $plugin->add_perfdata(
+    label => $label,
+    value => $value,
+    uom   => $uom,
+#   warn  => $warn,
+#   crit  => $crit,
+#   min   => $min,
+#   max   => $max
+  );
+
+  if($DEBUG) {
+    print qq|
+      ********** ProcessValue **********
+      label: $label
+      uom: $uom
+      type: $type
+      scale: $scale
+      constraints: $constraints
+      steps: $steps
+      value: $value
+    \n|;
+#     warn: $warn
+#     crit: $crit
+#     min:  $min
+#     max:  $max
+  }
+
 }
 
 ############################################################
