@@ -3,13 +3,13 @@
 use strict;
 use warnings;
 
+use Net::SNMP;
 use Monitoring::Plugin;
 
-my $DEBUG = 0;
 ############################################################
 # check_rittal_rcm.pl
 ############################################################
-# Prototypes
+
 sub ProcessValue($$$);
 ############################################################
 # Startup
@@ -30,38 +30,130 @@ $p->add_arg(
 );
 
 $p->add_arg(
+  spec => 'snmp_version|s=s',
+  help => 'SNMP version (1|2c|3)',
+  default => '2c',
+  required => 0
+);
+
+$p->add_arg(
   spec => 'community|C=s',
   help => 'SNMP community string',
-  required => 1
+  required => 0
+);
+
+$p->add_arg(
+  spec => 'username|u=s',
+  help => 'SNMPv3 Username',
+  required => 0
+);
+
+$p->add_arg(
+  spec => 'authpassword',
+  help => 'SNMPv3 authPassword',
+  required => 0
+);
+
+$p->add_arg(
+  spec => 'authkey',
+  help => 'SNMPv3 authKey',
+  required => 0
+);
+
+$p->add_arg(
+  spec => 'authprotocol',
+  help => 'SNMPv3 authProtocol',
+  default => 'md5',
+  required => 0
+);
+
+$p->add_arg(
+  spec => 'privpassword',
+  help => 'SNMPv3 privPassword',
+  required => 0
+);
+
+$p->add_arg(
+  spec => 'privkey',
+  help => 'SNMPv3 privKey',
+  required => 0
+);
+
+$p->add_arg(
+  spec => 'privprotocol',
+  help => 'SNMPv3 privProtocol',
+  default => 'des',
+  required => 0
 );
 
 $p->getopts();
 
-my $host = $p->opts->host;
-my $community = $p->opts->community;
-
 ############################################################
 # SNMP query
 
-use Net::SNMP;
+my($session,$error);
 
-my $OID = '1.3.6.1.4.1.2606.7.4.2.2.1';
-
-my ($session, $error) = Net::SNMP->session(
-   -hostname  => $host,
-   -community => $community,
-);
- 
-if (!defined $session) {
-   $p->plugin_exit(UNKNOWN,"ERROR: ".$error);
+if($p->opts->snmp_version eq '1' || $p->opts->snmp_version eq '2c') {
+  ($session, $error) = Net::SNMP->session(
+    -version   => $p->opts->snmp_version,
+    -hostname  => $p->opts->host,
+    -community => $p->opts->community,
+    -timeout   => $p->opts->timeout,
+  );
+} elsif($p->opts->snmp_version eq '3') {
+  if(defined($p->opts->authkey)) {
+    ($session, $error) = Net::SNMP->session(
+      -version      => $p->opts->snmp_version,
+      -hostname     => $p->opts->host,
+      -username     => $p->opts->username,
+      -authkey      => $p->opts->authkey,
+      -authprotocol => $p->opts->authprotocol,
+      -timeout      => $p->opts->timeout,
+    );
+  } elsif(defined($p->opts->authpassword)) {
+    ($session, $error) = Net::SNMP->session(
+      -version      => $p->opts->snmp_version,
+      -hostname     => $p->opts->host,
+      -username     => $p->opts->username,
+      -authpassword => $p->opts->authpassword,
+      -authprotocol => $p->opts->authprotocol,
+      -timeout      => $p->opts->timeout,
+    );
+  } elsif(defined($p->opts->privkey)) {
+    ($session, $error) = Net::SNMP->session(
+      -version      => $p->opts->snmp_version,
+      -hostname     => $p->opts->host,
+      -username     => $p->opts->username,
+      -privkey      => $p->opts->privkey,
+      -privprotocol => $p->opts->privprotocol,
+      -timeout      => $p->opts->timeout,
+    );
+  } elsif(defined($p->opts->privpassword)) {
+    ($session, $error) = Net::SNMP->session(
+      -version      => $p->opts->snmp_version,
+      -hostname     => $p->opts->host,
+      -username     => $p->opts->username,
+      -privpassword => $p->opts->privpassword,
+      -privprotocol => $p->opts->privprotocol,
+      -timeout      => $p->opts->timeout,
+    );
+  } else {
+  $error = qq|SNMP credentials incomplete|;
+  }
+} else {
+  $error = qq|SNMP version unknown|;
 }
  
-my $result = $session->get_table(-baseoid => $OID);
+unless(defined $session) {
+   $p->plugin_exit(UNKNOWN,'bla'.$error);
+}
+ 
+my $result = $session->get_table(-baseoid => '1.3.6.1.4.1.2606.7.4.2.2.1');
  
 if (!defined $result) {
    my $error = $session->error();
    $session->close();
-   $p->plugin_exit(UNKNOWN,"ERROR: ".$error);
+   $p->plugin_exit(UNKNOWN,$error);
 }
 
 ############################################################
@@ -146,13 +238,13 @@ for(my $Lx = 1; $Lx <= 3; $Lx++) {
   ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+34)); #59
 
   # Phase Lx.Voltage.Status
-  my $PhaseVoltageStatus     = $result->{sprintf("%s.%u",$bx,$ox+ 7)}; # 32
+  my $PhaseVoltageStatus = $result->{sprintf("%s.%u",$bx,$ox+ 7)}; # 32
   if($PhaseVoltageStatus ne 'OK') {
     $p->add_message(WARNING, qq|L$Lx: $PhaseVoltageStatus|);
   }
 
   # Phase Lx.Current.Status
-  my $PhaseCurrentStatus     = $result->{sprintf("%s.%u",$bx,$ox+17)}; # 42
+  my $PhaseCurrentStatus = $result->{sprintf("%s.%u",$bx,$ox+17)}; # 42
   if($PhaseCurrentStatus ne 'OK') {
     $p->add_message(WARNING, qq|L$Lx: $PhaseCurrentStatus|);
   }
@@ -219,36 +311,36 @@ $p->plugin_exit(OK, "should add my message!");
 
 ############################################################
 sub ProcessValue($$$) {
-  my($plugin,$result,$baseOID) = @_ or return(undef);
+  my($plugin,$result,$subOID) = @_ or return(undef);
 
   my($OID,@List);
 
   # get cmcIIIVarName --> 2606.7.4.2.2.1.3.2.1
-  @List = split(/\./,$baseOID); $List[12] = 3; $OID = join('.',@List);
+  @List = split(/\./,$subOID); $List[12] = 3; $OID = join('.',@List);
   my $label = $result->{$OID};
 
   # get cmcIIIVarUnit --> 2606.7.4.2.2.1.5.2.1
-  @List = split(/\./,$baseOID); $List[12] = 5; $OID = join('.',@List);
+  @List = split(/\./,$subOID); $List[12] = 5; $OID = join('.',@List);
   my $uom = $result->{$OID};
 
   # get cmcIIIVarType --> 2606.7.4.2.2.1.6.2.1
-  @List = split(/\./,$baseOID); $List[12] = 6; $OID = join('.',@List);
+  @List = split(/\./,$subOID); $List[12] = 6; $OID = join('.',@List);
   my $type = $result->{$OID};
 
   # get cmcIIIVarScale --> 2606.7.4.2.2.1.7.2.1
-  @List = split(/\./,$baseOID); $List[12] = 7; $OID = join('.',@List);
+  @List = split(/\./,$subOID); $List[12] = 7; $OID = join('.',@List);
   my $scale = $result->{$OID};
 
   # get cmcIIIVarConstraints --> 2606.7.4.2.2.1.8.2.1
-  @List = split(/\./,$baseOID); $List[12] = 8; $OID = join('.',@List);
+  @List = split(/\./,$subOID); $List[12] = 8; $OID = join('.',@List);
   my $constraints = $result->{$OID};
 
   # get cmcIIIVarSteps --> 2606.7.4.2.2.1.9.2.1
-  @List = split(/\./,$baseOID); $List[12] = 9; $OID = join('.',@List);
+  @List = split(/\./,$subOID); $List[12] = 9; $OID = join('.',@List);
   my $steps = $result->{$OID};
 
   # get cmcIIIVarValueInt --> 2606.7.4.2.2.1.11.2.1
-  @List = split(/\./,$baseOID); $List[12] = 11; $OID = join('.',@List);
+  @List = split(/\./,$subOID); $List[12] = 11; $OID = join('.',@List);
   my $value = $result->{$OID};
 
   # do value scaling
@@ -272,22 +364,21 @@ sub ProcessValue($$$) {
 #   max   => $max
   );
 
-  if($DEBUG) {
-    print qq|
-      ********** ProcessValue **********
-      label: $label
-      uom: $uom
-      type: $type
-      scale: $scale
-      constraints: $constraints
-      steps: $steps
-      value: $value
-    \n|;
-#     warn: $warn
-#     crit: $crit
-#     min:  $min
-#     max:  $max
-  }
+  # debug info (to be removed)
+  print qq|
+    ********** ProcessValue **********
+    label: $label
+    uom: $uom
+    type: $type
+    scale: $scale
+    constraints: $constraints
+    steps: $steps
+    value: $value
+  \n|;
+#   warn: $warn
+#   crit: $crit
+#   min:  $min
+#   max:  $max
 
 }
 
