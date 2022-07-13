@@ -368,16 +368,16 @@ sub ProcessValue($$$) {
   );
 
   # debug info (to be removed)
-  print qq|
-    ********** ProcessValue **********
-    label: $label
-    uom: $uom
-    type: $type
-    scale: $scale
-    constraints: $constraints
-    steps: $steps
-    value: $value
-  \n|;
+# print qq|
+#   ********** ProcessValue **********
+#   label: $label
+#   uom: $uom
+#   type: $type
+#   scale: $scale
+#   constraints: $constraints
+#   steps: $steps
+#   value: $value
+# \n|;
 #   warn: $warn
 #   crit: $crit
 #   min:  $min
