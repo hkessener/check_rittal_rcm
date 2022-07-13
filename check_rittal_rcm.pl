@@ -146,8 +146,10 @@ if($p->opts->snmp_version eq '1' || $p->opts->snmp_version eq '2c') {
 }
  
 unless(defined $session) {
-   $p->plugin_exit(UNKNOWN,'bla'.$error);
+   $p->plugin_exit(UNKNOWN,$error);
 }
+
+$session->max_msg_size(8192);
  
 my $result = $session->get_table(-baseoid => '1.3.6.1.4.1.2606.7.4.2.2.1');
  
