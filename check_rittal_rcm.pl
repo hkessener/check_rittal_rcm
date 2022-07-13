@@ -16,8 +16,9 @@ sub ProcessValue($$$);
 
 my $p = Monitoring::Plugin->new(
   usage => "This plugin checks Rittal RCM devices\n" .
-           "Usage: %s [-H <host>] [-C <community>]\n",
-  version => 'Version 0.12, July 8 2022, Hajo Kessener'
+           "Usage: %s [-H <host>] [-C <community>]\n".
+           "or use --help for a list of parameters]\n",
+  version => 'Version July 13 2022, Hajo Kessener'
 );
 
 ############################################################
