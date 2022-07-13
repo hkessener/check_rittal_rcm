@@ -202,7 +202,7 @@ ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.1');
 # Total.Neutral Current.Value
 ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.3');
 # Total.Power.Active.Value
-ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.12');
+my $ok_msg = ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.12');
 # Total.Energy.Active.Value
 ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.20');
 # Total.Energy.Active.Runtime.Value
@@ -310,7 +310,7 @@ if($code != OK) {
   $p->plugin_exit($code,$msgs);
 }
 
-$p->plugin_exit(OK, "should add my message!");
+$p->plugin_exit(OK, $ok_msg);
 
 ############################################################
 sub ProcessValue($$$) {
@@ -383,6 +383,7 @@ sub ProcessValue($$$) {
 #   min:  $min
 #   max:  $max
 
+  return(qq|$label is $value $uom|);
 }
 
 ############################################################
