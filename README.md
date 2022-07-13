@@ -21,7 +21,39 @@ This plugin is in a very early status, but functional. It queries the 3-phase ve
 
 # OPTIONS
 
-    none yet
+    -?, --usage
+      Print usage information
+    -h, --help
+      Print detailed help screen
+    -V, --version
+      Print version information
+    --extra-opts=[section][@file]
+      Read options from an ini file. See https://www.monitoring-plugins.org/doc/extra-opts.html
+      for usage and examples.
+    -H, --host=STRING
+      hostname or IP address
+    -s, --snmp_version=STRING
+      SNMP version (1|2c|3)
+    -C, --community=STRING
+      SNMP community string
+    -u, --username=STRING
+      SNMPv3 Username
+    --authpassword
+      SNMPv3 authPassword
+    --authkey
+      SNMPv3 authKey
+    --authprotocol
+      SNMPv3 authProtocol
+    --privpassword
+      SNMPv3 privPassword
+    --privkey
+      SNMPv3 privKey
+    --privprotocol
+      SNMPv3 privProtocol
+    -t, --timeout=INTEGER
+      Seconds before plugin times out (default: 15)
+    -v, --verbose
+      Show details for command-line debugging (can repeat up to 3 times)
 
 # SAMPLE OUTPUT
 
