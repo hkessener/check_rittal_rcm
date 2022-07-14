@@ -9,8 +9,11 @@ use Monitoring::Plugin;
 ############################################################
 # check_rittal_rcm.pl
 ############################################################
-
-sub ProcessValue($$$);
+sub ProcessVariable($$$);
+sub ProcessVariableWithThresholds($$$);
+sub ProcessVariableValue($$);
+sub ProcessVariableConstraints($);
+sub OID_up($);
 ############################################################
 # Startup
 
@@ -197,16 +200,30 @@ if($SystemHealthSupplyStatus ne 'OK') {
 ############################################################
 # Process section "RCM-Inline"
 
-# Total.Frequency.Value
-ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.1');
-# Total.Neutral Current.Value
-ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.3');
-# Total.Power.Active.Value
-my $ok_msg = ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.12');
-# Total.Energy.Active.Value
-ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.20');
-# Total.Energy.Active.Runtime.Value
-ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.21');
+# Total.Frequency
+ProcessVariable($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.1');
+
+# Total.Neutral Current
+ProcessVariableWithThresholds($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.3');
+my $TotalNeutralCurrentStatus = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.9'};
+
+if($TotalNeutralCurrentStatus ne 'OK') {
+  $p->add_message(WARNING, $TotalNeutralCurrentStatus);
+}
+
+# Total.Power.Active
+my $ok_msg = ProcessVariableWithThresholds($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.12');
+my $TotalPowerActiveStatus = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.9'};
+
+if($TotalPowerActiveStatus ne 'OK') {
+  $p->add_message(WARNING, $TotalPowerActiveStatus);
+}
+
+# Total.Energy.Active
+ProcessVariable($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.20');
+
+# Total.Energy.Active.Runtime
+ProcessVariable($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.21');
 
 # Phases L1...L3
 for(my $Lx = 1; $Lx <= 3; $Lx++) {
@@ -215,30 +232,30 @@ for(my $Lx = 1; $Lx <= 3; $Lx++) {
   my $bx = '1.3.6.1.4.1.2606.7.4.2.2.1.10.2';
   # OID offset:
   # L1 values start at OID '1.3.6.1.4.1.2606.7.4.2.2.1.10.2.25'
-  # L1 values start at OID '1.3.6.1.4.1.2606.7.4.2.2.1.10.2.60'
-  # L1 values start at OID '1.3.6.1.4.1.2606.7.4.2.2.1.10.2.95'
+  # L2 values start at OID '1.3.6.1.4.1.2606.7.4.2.2.1.10.2.60'
+  # L3 values start at OID '1.3.6.1.4.1.2606.7.4.2.2.1.10.2.95'
   my $ox = ($Lx - 1) * 35 + 25;
 
-  # Phase Lx.Voltage.Value
-  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+ 1)); #26
-  # Phase Lx.Voltage.THD.Value
-  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+ 9)); #34
-  # Phase Lx.Current.Value
-  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+11)); #36
-  # Phase Lx.Current.THD.Value
-  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+19)); #44
-  # Phase Lx.Power.Factor.Value
-  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+20)); #45
-  # Phase Lx.Power.Active.Value
-  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+22)); #47
-  # Phase Lx.Power.Reactive.Value
-  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+30)); #55
-  # Phase Lx.Power.Apparent.Value
-  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+31)); #56
-  # Phase Lx.Energy.Active.Value
-  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+32)); #57
-  # Phase Lx.Energy.Apparent.Value
-  ProcessValue($p,$result,sprintf("%s.%u",$bx,$ox+34)); #59
+  # Phase Lx.Voltage
+  ProcessVariableWithThresholds($p,$result,sprintf("%s.%u",$bx,$ox+ 1)); #26
+  # Phase Lx.Voltage.THD
+  ProcessVariable($p,$result,sprintf("%s.%u",$bx,$ox+ 9)); #34
+  # Phase Lx.Current
+  ProcessVariableWithThresholds($p,$result,sprintf("%s.%u",$bx,$ox+11)); #36
+  # Phase Lx.Current.THD
+  ProcessVariable($p,$result,sprintf("%s.%u",$bx,$ox+19)); #44
+  # Phase Lx.Power.Factor
+  ProcessVariable($p,$result,sprintf("%s.%u",$bx,$ox+20)); #45
+  # Phase Lx.Power.Active
+  ProcessVariableWithThresholds($p,$result,sprintf("%s.%u",$bx,$ox+22)); #47
+  # Phase Lx.Power.Reactive
+  ProcessVariable($p,$result,sprintf("%s.%u",$bx,$ox+30)); #55
+  # Phase Lx.Power.Apparent
+  ProcessVariable($p,$result,sprintf("%s.%u",$bx,$ox+31)); #56
+  # Phase Lx.Energy.Active
+  ProcessVariable($p,$result,sprintf("%s.%u",$bx,$ox+32)); #57
+  # Phase Lx.Energy.Apparent
+  ProcessVariable($p,$result,sprintf("%s.%u",$bx,$ox+34)); #59
 
   # Phase Lx.Voltage.Status
   my $PhaseVoltageStatus = $result->{sprintf("%s.%u",$bx,$ox+ 7)}; # 32
@@ -264,18 +281,12 @@ for(my $Lx = 1; $Lx <= 3; $Lx++) {
 
 # RCMs.RCM 01.General.Status
 my $RCMsRCM01GeneralStatus = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.134'};
-
 if($RCMsRCM01GeneralStatus ne 'OK') {
   $p->add_message(WARNING, qq|RCM01 General-Status: $RCMsRCM01GeneralStatus|);
 }
 
-# RCMs.RCM 01.AC.Value
-ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.137');
-# RCMs.RCM 01.AC.SetPtHighAlarm
-ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.138');
-# RCMs.RCM 01.AC.SetPtHighWarn
-ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.139');
-
+# RCMs.RCM 01.AC
+ProcessVariable($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.137');
 # RCMs.RCM 01.AC.Status
 my $RCMsRCM01ACStatus = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.141'};
 
@@ -283,13 +294,8 @@ if($RCMsRCM01ACStatus ne 'OK') {
   $p->add_message(WARNING, qq|RCM01 AC-Status: $RCMsRCM01ACStatus|);
 }
 
-# RCMs.RCM 01.DC.Value
-ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.144');
-# RCMs.RCM 01.DC.SetPtHighAlarm
-ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.145');
-# RCMs.RCM 01.DC.SetPtHighWarn
-ProcessValue($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.146');
-
+# RCMs.RCM 01.DC
+ProcessVariable($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.144');
 # RCMs.RCM 01.DC.Status
 my $RCMsRCM01DCStatus = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.148'};
 
@@ -313,76 +319,134 @@ if($code != OK) {
 $p->plugin_exit(OK, $ok_msg);
 
 ############################################################
-sub ProcessValue($$$) {
+sub ProcessVariable($$$) {
   my($plugin,$result,$subOID) = @_ or return(undef);
 
-  my($OID,@List);
+  # the variable itself
+  my($label,$uom,$value,$min,$max) = ProcessVariableValue($result,$subOID);
 
-  # get cmcIIIVarName --> 2606.7.4.2.2.1.3.2.1
-  @List = split(/\./,$subOID); $List[12] = 3; $OID = join('.',@List);
-  my $label = $result->{$OID};
-
-  # get cmcIIIVarUnit --> 2606.7.4.2.2.1.5.2.1
-  @List = split(/\./,$subOID); $List[12] = 5; $OID = join('.',@List);
-  my $uom = $result->{$OID};
-
-  # get cmcIIIVarType --> 2606.7.4.2.2.1.6.2.1
-  @List = split(/\./,$subOID); $List[12] = 6; $OID = join('.',@List);
-  my $type = $result->{$OID};
-
-  # get cmcIIIVarScale --> 2606.7.4.2.2.1.7.2.1
-  @List = split(/\./,$subOID); $List[12] = 7; $OID = join('.',@List);
-  my $scale = $result->{$OID};
-
-  # get cmcIIIVarConstraints --> 2606.7.4.2.2.1.8.2.1
-  @List = split(/\./,$subOID); $List[12] = 8; $OID = join('.',@List);
-  my $constraints = $result->{$OID};
-
-  # get cmcIIIVarSteps --> 2606.7.4.2.2.1.9.2.1
-  @List = split(/\./,$subOID); $List[12] = 9; $OID = join('.',@List);
-  my $steps = $result->{$OID};
-
-  # get cmcIIIVarValueInt --> 2606.7.4.2.2.1.11.2.1
-  @List = split(/\./,$subOID); $List[12] = 11; $OID = join('.',@List);
-  my $value = $result->{$OID};
-
-  # do value scaling
-  $value = ($scale < 0) ? $value / abs($scale) : $value * $scale;
-
-  # do constraints processing
-  #
-  # the string presented by RCM looks like this:
-  # "integer: min 0, max 2000000000, scale /10, step 1"
-  #
-  # we want to extract 'min' and 'max' values
-
-  # first remove ':' and ','
-  $constraints =~ s/:|,//g;
-  # split remaining items into list
-  my @items = split(/ /,$constraints);
-  # extract min and max values
-  my($min,$max);
-  for(my $i = 0; $i < @items; $i++) {
-    $min = $items[$i+1] if($items[$i] eq 'min');
-    $max = $items[$i+1] if($items[$i] eq 'max');
-  }
-
-  # $warn = 0;
-  # $crit = 0;
-
-  # label=value[uom];[warn];[crit];[min];[max]
+  # put all this together into a perfdata item
+  # label=value[uom];;;[min];[max]
   $plugin->add_perfdata(
     label => $label,
     value => $value,
     uom   => $uom,
-#   warn  => $warn,
-#   crit  => $crit,
     min   => $min,
     max   => $max
   );
 
   return(qq|$label is $value $uom|);
 }
+############################################################
+sub ProcessVariableWithThresholds($$$) {
+  my($plugin,$result,$subOID) = @_ or return(undef);
 
+  # the variable itself
+  my($label,$uom,$value,$min,$max) = ProcessVariableValue($result,$subOID);
+
+  # critical high
+  $subOID = OID_up($subOID);
+  my($ch_label,$ch_uom,$ch_value,$ch_min,$ch_max) = ProcessVariableValue($result,$subOID);
+
+  # warning high
+  $subOID = OID_up($subOID);
+  my($wh_label,$wh_uom,$wh_value,$wh_min,$wh_max) = ProcessVariableValue($result,$subOID);
+
+  # warning low
+  $subOID = OID_up($subOID);
+  my($wl_label,$wl_uom,$wl_value,$wl_min,$wl_max) = ProcessVariableValue($result,$subOID);
+
+  # critical low
+  $subOID = OID_up($subOID);
+  my($cl_label,$cl_uom,$cl_value,$cl_min,$cl_max) = ProcessVariableValue($result,$subOID);
+
+  my $warn = "$wl_value:$wh_value";
+  my $crit = "$cl_value:$ch_value";
+
+  # put all this together into a perfdata item
+  # label=value[uom];[warn];[crit];[min];[max]
+  $plugin->add_perfdata(
+    label => $label,
+    value => $value,
+    uom   => $uom,
+    warn  => $warn,
+    crit  => $crit,
+    min   => $min,
+    max   => $max
+  );
+
+  return(qq|$label is $value $uom|);
+}
+############################################################
+sub ProcessVariableValue($$) {
+  my($result,$subOID) = @_ or return(undef);
+
+  my($oid,@list);
+
+  # get cmcIIIVarName
+  @list = split(/\./,$subOID); $list[12] = 3; $oid = join('.',@list);
+  my $label = $result->{$oid};
+
+  # get cmcIIIVarUnit
+  @list = split(/\./,$subOID); $list[12] = 5; $oid = join('.',@list);
+  my $uom = $result->{$oid};
+
+  # get cmcIIIVarScale
+  @list = split(/\./,$subOID); $list[12] = 7; $oid = join('.',@list);
+  my $scale = $result->{$oid};
+
+  # get cmcIIIVarConstraints
+  @list = split(/\./,$subOID); $list[12] = 8; $oid = join('.',@list);
+  my $constraints = $result->{$oid};
+
+  # get cmcIIIVarValueInt
+  @list = split(/\./,$subOID); $list[12] = 11; $oid = join('.',@list);
+  my $value = $result->{$oid};
+
+  # do value scaling
+  $value = ($scale < 0) ? $value / abs($scale) : $value * $scale;
+
+  # get constraints
+  my($min,$max) = ProcessVariableConstraints($constraints);
+
+  return($label,$uom,$value,$min,$max);
+}
+############################################################
+sub ProcessVariableConstraints($) {
+  my $string = shift(@_) or return(undef);
+
+  # the string presented by RCM looks like this:
+  # "integer: min 0, max 2000000000, scale /10, step 1"
+  #
+  # for now, we want to extract 'min' and 'max' values
+
+  my $min = '';
+  my $max = '';
+
+  # first remove ':' and ','
+  $string =~ s/:|,//g;
+
+  # split remaining items into list
+  my @items = split(/ /,$string);
+
+  # extract min and max values
+  for(my $i = 0; $i < @items; $i++) {
+    $min = $items[$i+1] if($items[$i] eq 'min');
+    $max = $items[$i+1] if($items[$i] eq 'max');
+  }
+
+  return($min,$max);
+}
+############################################################
+sub OID_up($) {
+  my($oid) = shift(@_) or return(undef);
+
+  my @list = split('\.',$oid);
+  my $ix = pop(@list); $ix++; push(@list,$ix);
+
+  $oid = join('.',@list);
+
+  return($oid);
+}
 ############################################################
 1;
