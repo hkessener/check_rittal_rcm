@@ -349,12 +349,26 @@ sub ProcessValue($$$) {
   # do value scaling
   $value = ($scale < 0) ? $value / abs($scale) : $value * $scale;
 
-# my($warn,$crit,$min,$max);
+  # do constraints processing
+  #
+  # the string presented by RCM looks like this:
+  # "integer: min 0, max 2000000000, scale /10, step 1"
+  #
+  # we want to extract 'min' and 'max' values
 
-# $warn = 0;
-# $crit = 0;
-# $min  = 0;
-# $max  = 0;
+  # first remove ':' and ','
+  $constraints =~ s/:|,//g;
+  # split remaining items into list
+  my @items = split(/ /,$constraints);
+  # extract min and max values
+  my($min,$max);
+  for(my $i = 0; $i < @items; $i++) {
+    $min = $items[$i+1] if($items[$i] eq 'min');
+    $max = $items[$i+1] if($items[$i] eq 'max');
+  }
+
+  # $warn = 0;
+  # $crit = 0;
 
   # label=value[uom];[warn];[crit];[min];[max]
   $plugin->add_perfdata(
@@ -363,25 +377,9 @@ sub ProcessValue($$$) {
     uom   => $uom,
 #   warn  => $warn,
 #   crit  => $crit,
-#   min   => $min,
-#   max   => $max
+    min   => $min,
+    max   => $max
   );
-
-  # debug info (to be removed)
-# print qq|
-#   ********** ProcessValue **********
-#   label: $label
-#   uom: $uom
-#   type: $type
-#   scale: $scale
-#   constraints: $constraints
-#   steps: $steps
-#   value: $value
-# \n|;
-#   warn: $warn
-#   crit: $crit
-#   min:  $min
-#   max:  $max
 
   return(qq|$label is $value $uom|);
 }
