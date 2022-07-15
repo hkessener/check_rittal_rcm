@@ -360,19 +360,19 @@ sub ProcessVariableWithThresholds($$$) {
   $subOID = OID_up($subOID);
   my($cl_label,$cl_uom,$cl_value,$cl_min,$cl_max) = ProcessVariableValue($result,$subOID);
 
-  my $warn = "$wl_value:$wh_value";
-  my $crit = "$cl_value:$ch_value";
+  my $warning  = "$wl_value:$wh_value";
+  my $critical = "$cl_value:$ch_value";
 
   # put all this together into a perfdata item
   # label=value[uom];[warn];[crit];[min];[max]
   $plugin->add_perfdata(
-    label => $label,
-    value => $value,
-    uom   => $uom,
-    warn  => $warn,
-    crit  => $crit,
-    min   => $min,
-    max   => $max
+    label    => $label,
+    value    => $value,
+    uom      => $uom,
+    warning  => $warning,
+    critical => $critical,
+    min      => $min,
+    max      => $max
   );
 
   return(qq|$label is $value $uom|);
@@ -398,6 +398,10 @@ sub ProcessVariableValue($$) {
   # get cmcIIIVarConstraints
   @list = split(/\./,$subOID); $list[12] = 8; $oid = join('.',@list);
   my $constraints = $result->{$oid};
+
+  # get cmcIIIVarSteps
+  @list = split(/\./,$subOID); $list[12] = 9; $oid = join('.',@list);
+  my $steps = $result->{$oid};
 
   # get cmcIIIVarValueInt
   @list = split(/\./,$subOID); $list[12] = 11; $oid = join('.',@list);
