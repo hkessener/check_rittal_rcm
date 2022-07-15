@@ -21,7 +21,7 @@ my $p = Monitoring::Plugin->new(
   usage => "This plugin checks Rittal RCM devices\n" .
            "Usage: %s [-H <host>] [-C <community>]\n".
            "or use --help for a list of parameters]\n",
-  version => 'Version July 13 2022, Hajo Kessener'
+  version => 'Version 0.15 July 15 2022, Hajo Kessener'
 );
 
 ############################################################
