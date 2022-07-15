@@ -12,7 +12,7 @@ Residual Current Monitoring (RCM) is used where RCD are not practical due to the
 
 Rittal has a new series (introduced in 2021) of RCM devices on offer ("RCM Measuring Module/Inline Meter"). These are based on the well-known CMC3 and can be queried via SNMP.
 
-This plugin is in a very early status, but functional. It queries the 3-phase version of the RCM for all operating variables of interest to us and outputs performance data. The corresponding list of OIDs is attached.
+This plugin queries the 3-phase version of the RCM for all operating variables of interest to us and outputs performance data. The complete list of OIDs is attached.
 
 
 # SYNOPSIS
