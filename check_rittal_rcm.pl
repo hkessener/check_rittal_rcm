@@ -19,16 +19,16 @@ sub OID_up($);
 
 my $p = Monitoring::Plugin->new(
   usage => "This plugin checks Rittal RCM devices\n" .
-           "Usage: %s [-H <host>] [-C <community>]\n".
+           "Usage: %s [-H <hostname>] [-C <community>]\n".
            "or use --help for a list of parameters]\n",
-  version => 'Version 0.15 July 15 2022, Hajo Kessener'
+  version => 'Version 0.16 Sep 22 2022, Hajo Kessener'
 );
 
 ############################################################
 # Arguments
 
 $p->add_arg(
-  spec => 'host|H=s',
+  spec => 'hostname|H=s',
   help => 'hostname or IP address',
   required => 1
 );
@@ -100,7 +100,7 @@ my($session,$error);
 if($p->opts->snmp_version eq '1' || $p->opts->snmp_version eq '2c') {
   ($session, $error) = Net::SNMP->session(
     -version   => $p->opts->snmp_version,
-    -hostname  => $p->opts->host,
+    -hostname  => $p->opts->hostname,
     -community => $p->opts->community,
     -timeout   => $p->opts->timeout,
   );
@@ -108,7 +108,7 @@ if($p->opts->snmp_version eq '1' || $p->opts->snmp_version eq '2c') {
   if(defined($p->opts->authkey)) {
     ($session, $error) = Net::SNMP->session(
       -version      => $p->opts->snmp_version,
-      -hostname     => $p->opts->host,
+      -hostname     => $p->opts->hostname,
       -username     => $p->opts->username,
       -authkey      => $p->opts->authkey,
       -authprotocol => $p->opts->authprotocol,
@@ -117,7 +117,7 @@ if($p->opts->snmp_version eq '1' || $p->opts->snmp_version eq '2c') {
   } elsif(defined($p->opts->authpassword)) {
     ($session, $error) = Net::SNMP->session(
       -version      => $p->opts->snmp_version,
-      -hostname     => $p->opts->host,
+      -hostname     => $p->opts->hostname,
       -username     => $p->opts->username,
       -authpassword => $p->opts->authpassword,
       -authprotocol => $p->opts->authprotocol,
@@ -126,7 +126,7 @@ if($p->opts->snmp_version eq '1' || $p->opts->snmp_version eq '2c') {
   } elsif(defined($p->opts->privkey)) {
     ($session, $error) = Net::SNMP->session(
       -version      => $p->opts->snmp_version,
-      -hostname     => $p->opts->host,
+      -hostname     => $p->opts->hostname,
       -username     => $p->opts->username,
       -privkey      => $p->opts->privkey,
       -privprotocol => $p->opts->privprotocol,
@@ -135,7 +135,7 @@ if($p->opts->snmp_version eq '1' || $p->opts->snmp_version eq '2c') {
   } elsif(defined($p->opts->privpassword)) {
     ($session, $error) = Net::SNMP->session(
       -version      => $p->opts->snmp_version,
-      -hostname     => $p->opts->host,
+      -hostname     => $p->opts->hostname,
       -username     => $p->opts->username,
       -privpassword => $p->opts->privpassword,
       -privprotocol => $p->opts->privprotocol,
