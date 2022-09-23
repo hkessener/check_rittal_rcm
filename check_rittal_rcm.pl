@@ -385,7 +385,10 @@ sub ProcessVariableValue($$) {
 
   # get cmcIIIVarName
   @list = split(/\./,$subOID); $list[12] = 3; $oid = join('.',@list);
-  my $label = $result->{$oid};
+  my $label = $result->{$oid};a
+
+  # replace dots with blanks
+  $label =~ s/\./ /g;
 
   # get cmcIIIVarUnit
   @list = split(/\./,$subOID); $list[12] = 5; $oid = join('.',@list);
