@@ -204,8 +204,8 @@ if($SystemHealthSupplyStatus ne 'OK') {
 ProcessVariable($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.1');
 
 # Total.Neutral Current
-ProcessVariableWithThresholds($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.3');
-my $TotalNeutralCurrentStatus = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.9'};
+ProcessVariableWithThresholds($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.3');
+my $TotalNeutralCurrentStatus = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.9'};
 
 if($TotalNeutralCurrentStatus ne 'OK') {
   $p->add_message(WARNING, $TotalNeutralCurrentStatus);
@@ -213,7 +213,7 @@ if($TotalNeutralCurrentStatus ne 'OK') {
 
 # Total.Power.Active
 my $ok_msg = ProcessVariableWithThresholds($p,$result,'1.3.6.1.4.1.2606.7.4.2.2.1.3.2.12');
-my $TotalPowerActiveStatus = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.9'};
+my $TotalPowerActiveStatus = $result->{'1.3.6.1.4.1.2606.7.4.2.2.1.10.2.18'};
 
 if($TotalPowerActiveStatus ne 'OK') {
   $p->add_message(WARNING, $TotalPowerActiveStatus);
