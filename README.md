@@ -6,7 +6,7 @@ check_rittal_rcm.pl
 
 Plugin for Icinga 2 (or Nagios) to check the status of Rittal RCM devices.
 
-** No longer maintained and superseeded by check_rittal_pdu, see my other repository. **
+**No longer maintained and superseeded by check_rittal_pdu, see my other repository.**
 
 Residual Current Devices (RCD) are used for personal protection at electrical operating sites. In the event of a fault (the presence of a residual current), the voltage is switched off by the RCD.
 
