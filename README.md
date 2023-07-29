@@ -6,11 +6,13 @@ check_rittal_rcm.pl
 
 Plugin for Icinga 2 (or Nagios) to check the status of Rittal RCM devices.
 
+** No longer maintained and superseeded by check_rittal_pdu, see my other repository. **
+
 Residual Current Devices (RCD) are used for personal protection at electrical operating sites. In the event of a fault (the presence of a residual current), the voltage is switched off by the RCD.
 
 Residual Current Monitoring (RCM) is used where RCD are not practical due to their disruptive nature. This will often be the case in a data center where high availability of services is sought. RCM devices monitor relevant electrical operating variables and signal anomalies, but without shutting down.
 
-Rittal has a new series (introduced in 2021) of RCM devices on offer ("RCM Measuring Module/Inline Meter"). These are based on the well-known CMC3 and can be queried via SNMP.
+Rittal has a new series (introduced in 2021) of RCM devices on offer ("RCM Measuring Module/Inline Meter"). These are part of the PDU line and can be queried via SNMP.
 
 This plugin queries the 3-phase version of the RCM for all operating variables of interest to us and outputs performance data. The complete list of OIDs is attached.
 
